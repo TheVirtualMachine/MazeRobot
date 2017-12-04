@@ -24,6 +24,8 @@
 * If you have any inquiries, contact us at wongtech@vincemacri.ca              *
 ********************************************************************************/
 
+#include "sounds.h"
+
 // Define LDR pins.
 #define LEFT_LDR_PIN A0
 #define MIDDLE_LDR_PIN A1
@@ -36,6 +38,9 @@
 #define LEFT_BACKWARD 12 // The pin to move the left motor backwards.
 #define RIGHT_FORWARD 6 // The pin to move the right motor forwards.
 #define RIGHT_BACKWARD 7 // The pin to move the right motor backwards.
+
+// Define miscellaneous pins.
+#define SPEAKER 3 // The pin for the speaker.
 
 // Variables for LDRs.
 int leftLDR, middleLDR, rightLDR;
@@ -150,13 +155,30 @@ bool isLDRTriggered(int level) {
 	return (level >= LDR_THRESHOLD);
 }
 
+// Read sensors.
+void sense() {
+	readLDR();
+}
+
+void backupNoise() {
+	noTone(SPEAKER);
+	tone(SPEAKER, BACKUP_PITCH, BACKUP_LENGTH);
+}
+
 // Do the line tracking.
 void lineTrack() {
-	readLDR();
-	if (isLDRTriggered(middleLDR)) {
+	if (!isLDRTriggered(middleLDR)) {
+		if (isLDRTriggered(leftLDR)) {
+			veerLeft();
+		} else if (isLDRTriggered(rightLDR)) {
+			veerRight();
+		} else {
+			turnLeft();
+		}
 	}
 }
 
 void loop() {
+	sense();
 	lineTrack();
 }
