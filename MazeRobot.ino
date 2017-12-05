@@ -49,8 +49,8 @@ int leftLDR, middleLDR, rightLDR;
 #define LDR_THRESHOLD 550
 
 // Define motor power amounts.
-#define FULL_POWER 255 // Analog value for full motor power.
-#define HALF_POWER 128 // Analog value for half motor power.
+#define FULL_POWER 200 // Analog value for full motor power.
+#define HALF_POWER 150 // Analog value for half motor power.
 #define NO_POWER 0 // Analog value for no motor power.
 
 // Setup the program.
@@ -62,6 +62,7 @@ void setup() {
 	pinMode(LEFT_BACKWARD, OUTPUT);
 	pinMode(RIGHT_FORWARD, OUTPUT);
 	pinMode(RIGHT_BACKWARD, OUTPUT);
+	stop();
 
 	Serial.begin(9600); // Start the serial communication.
 }
