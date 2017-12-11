@@ -28,16 +28,14 @@
 
 // Define LDR pins.
 #define LEFT_LDR_PIN A0
-#define MIDDLE_LDR_PIN A1
-#define RIGHT_LDR_PIN A2
+#define MIDDLE_LDR_PIN A2
+#define RIGHT_LDR_PIN A4
 
 // Define motor pin numbers.
-#define LEFT_ENABLE 10 // The pin to enable the left motor.
-#define RIGHT_ENABLE 11 // The pin to enable the right motor.
 #define LEFT_FORWARD 13 // The pin to move the left motor forwards.
 #define LEFT_BACKWARD 12 // The pin to move the left motor backwards.
-#define RIGHT_FORWARD 6 // The pin to move the right motor forwards.
-#define RIGHT_BACKWARD 7 // The pin to move the right motor backwards.
+#define RIGHT_FORWARD 7 // The pin to move the right motor forwards.
+#define RIGHT_BACKWARD 6 // The pin to move the right motor backwards.
 
 // Define miscellaneous pins.
 #define SPEAKER 3 // The pin for the speaker.
@@ -46,7 +44,7 @@
 int leftLDR, middleLDR, rightLDR;
 
 // Define thresholds.
-#define LDR_THRESHOLD 550
+#define LDR_THRESHOLD 400
 
 // Define motor power amounts.
 #define FULL_POWER 200 // Analog value for full motor power.
@@ -56,8 +54,6 @@ int leftLDR, middleLDR, rightLDR;
 // Setup the program.
 void setup() {
 	// Setup the motors.
-	pinMode(LEFT_ENABLE, OUTPUT);
-	pinMode(RIGHT_ENABLE, OUTPUT);
 	pinMode(LEFT_FORWARD, OUTPUT);
 	pinMode(LEFT_BACKWARD, OUTPUT);
 	pinMode(RIGHT_FORWARD, OUTPUT);
@@ -76,9 +72,7 @@ void readLDR() {
 
 // Move forward.
 void forward() {
-	analogWrite(LEFT_ENABLE, FULL_POWER);
-	analogWrite(RIGHT_ENABLE, FULL_POWER);
-
+	Serial.println("Forward");
 	digitalWrite(LEFT_FORWARD, HIGH);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, HIGH);
@@ -87,53 +81,25 @@ void forward() {
 
 // Turn left.
 void turnLeft() {
-	analogWrite(LEFT_ENABLE, FULL_POWER);
-	analogWrite(RIGHT_ENABLE, FULL_POWER);
-
+	Serial.println("Left");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, HIGH);
 	digitalWrite(RIGHT_FORWARD, HIGH);
 	digitalWrite(RIGHT_BACKWARD, LOW);
 }
 
-// Veer left.
-void veerLeft() {
-	analogWrite(LEFT_ENABLE, HALF_POWER);
-	analogWrite(RIGHT_ENABLE, FULL_POWER);
-
-	digitalWrite(LEFT_FORWARD, HIGH);
-	digitalWrite(LEFT_BACKWARD, LOW);
-	digitalWrite(RIGHT_FORWARD, HIGH);
-	digitalWrite(RIGHT_BACKWARD, LOW);
-}
-
 // Turn right.
 void turnRight() {
-	analogWrite(LEFT_ENABLE, FULL_POWER);
-	analogWrite(RIGHT_ENABLE, FULL_POWER);
-
+	Serial.println("Right");
 	digitalWrite(LEFT_FORWARD, HIGH);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, LOW);
 	digitalWrite(RIGHT_BACKWARD, HIGH);
 }
 
-// Veer right.
-void veerRight() {
-	analogWrite(LEFT_ENABLE, FULL_POWER);
-	analogWrite(RIGHT_ENABLE, HALF_POWER);
-
-	digitalWrite(LEFT_FORWARD, HIGH);
-	digitalWrite(LEFT_BACKWARD, LOW);
-	digitalWrite(RIGHT_FORWARD, HIGH);
-	digitalWrite(RIGHT_BACKWARD, LOW);
-}
-
 // Move backward.
 void backward() {
-	analogWrite(LEFT_ENABLE, FULL_POWER);
-	analogWrite(RIGHT_ENABLE, FULL_POWER);
-
+	Serial.println("Backward");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, HIGH);
 	digitalWrite(RIGHT_FORWARD, LOW);
@@ -142,9 +108,7 @@ void backward() {
 
 // Stop the motors.
 void stop() {
-	analogWrite(LEFT_ENABLE, NO_POWER);
-	analogWrite(RIGHT_ENABLE, NO_POWER);
-
+	Serial.println("Stop");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, LOW);
@@ -168,18 +132,26 @@ void backupNoise() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (!isLDRTriggered(middleLDR)) {
-		if (isLDRTriggered(leftLDR)) {
-			veerLeft();
-		} else if (isLDRTriggered(rightLDR)) {
-			veerRight();
-		} else {
-			turnLeft();
-		}
+	if (!isLDRTriggered(leftLDR) && !isLDRTriggered(middleLDR) && !isLDRTriggered(rightLDR)) {
+		turnLeft();
+	} else if (isLDRTriggered(leftLDR) ^ isLDRTriggered(rightLDR)) {
+		forward();
+	} else if (isLDRTriggered(middleLDR)) {
+		turnRight();
+	} else {
+		turnRight();
 	}
 }
 
 void loop() {
+	turnLeft();
+	return;
 	sense();
+	Serial.print(leftLDR);
+	Serial.print(" ");
+	Serial.print(middleLDR);
+	Serial.print(" ");
+	Serial.println(rightLDR);
 	lineTrack();
+	delay(50);
 }
