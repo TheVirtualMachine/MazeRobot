@@ -44,7 +44,7 @@
 int leftLDR, middleLDR, rightLDR;
 
 // Define thresholds.
-#define LDR_THRESHOLD 400
+#define LDR_THRESHOLD 450
 
 // Define motor power amounts.
 #define FULL_POWER 200 // Analog value for full motor power.
@@ -53,6 +53,7 @@ int leftLDR, middleLDR, rightLDR;
 
 // Setup the program.
 void setup() {
+	delay(100); // Give everything time to warm up.
 	// Setup the motors.
 	pinMode(LEFT_FORWARD, OUTPUT);
 	pinMode(LEFT_BACKWARD, OUTPUT);
@@ -61,6 +62,7 @@ void setup() {
 	stop();
 
 	Serial.begin(9600); // Start the serial communication.
+	delay(1000); // Give everything time to warm up.
 }
 
 // Read the LDR sensors.
@@ -116,6 +118,7 @@ void stop() {
 }
 
 // Check if a given LDR reading should trigger a reaction.
+// Returns true on black, and false on white.
 bool isLDRTriggered(int level) {
 	return (level >= LDR_THRESHOLD);
 }
@@ -123,6 +126,11 @@ bool isLDRTriggered(int level) {
 // Read sensors.
 void sense() {
 	readLDR();
+	Serial.print(leftLDR);
+	Serial.print(" ");
+	Serial.print(middleLDR);
+	Serial.print(" ");
+	Serial.println(rightLDR);
 }
 
 void backupNoise() {
@@ -134,24 +142,35 @@ void backupNoise() {
 void lineTrack() {
 	if (!isLDRTriggered(leftLDR) && !isLDRTriggered(middleLDR) && !isLDRTriggered(rightLDR)) {
 		turnLeft();
-	} else if (isLDRTriggered(leftLDR) ^ isLDRTriggered(rightLDR)) {
-		forward();
-	} else if (isLDRTriggered(middleLDR)) {
+		delay(10);
+	} else if (isLDRTriggered(leftLDR) && isLDRTriggered(middleLDR) && isLDRTriggered(rightLDR)) {
 		turnRight();
+		delay(10);
 	} else {
-		turnRight();
+		forward();
+		delay(5);
+		if (isLDRTriggered(middleLDR)) {
+			if (isLDRTriggered(leftLDR) && !isLDRTriggered(rightLDR)) {
+				forward();
+			} else {
+				turnRight();
+				delay(5);
+			}
+		} else {
+			if (isLDRTriggered(rightLDR)) {
+				turnRight();
+				delay(10);
+			} else {
+				turnLeft();
+			}
+		}
 	}
 }
 
 void loop() {
-	turnLeft();
-	return;
+	stop();
+	delay(25);
 	sense();
-	Serial.print(leftLDR);
-	Serial.print(" ");
-	Serial.print(middleLDR);
-	Serial.print(" ");
-	Serial.println(rightLDR);
 	lineTrack();
-	delay(50);
+	delay(15);
 }
