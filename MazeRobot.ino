@@ -140,38 +140,14 @@ void backupNoise() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (isLDRTriggered(leftLDR)) {
-		if (isLDRTriggered(middleLDR)) {
-			if (isLDRTriggered(rightLDR)) {
-				turnRight();
-			} else {
-				turnRight();
-			}
+	if (!isLDRTriggered(middleLDR) && !isLDRTriggered(rightLDR)) {
+		if (isLDRTriggered(leftLDR)) {
+			forward();
 		} else {
-			if (isLDRTriggered(rightLDR)) {
-				turnRight();
-			} else {
-				forward();
-				delay(10);
-				stop();
-			}
+			turnLeft();
 		}
 	} else {
-		if (isLDRTriggered(middleLDR)) {
-			if (isLDRTriggered(rightLDR)) {
-				turnLeft();
-			} else {
-				turnRight();
-			}
-		} else {
-			if (isLDRTriggered(rightLDR)) {
-				forward();
-				delay(10);
-				stop();
-			} else {
-				turnLeft();
-			}
-		}
+		turnRight();
 	}
 }
 
