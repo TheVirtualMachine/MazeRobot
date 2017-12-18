@@ -44,7 +44,7 @@
 int leftLDR, middleLDR, rightLDR;
 
 // Define thresholds.
-#define LDR_THRESHOLD 450
+#define LDR_THRESHOLD 500
 
 // Define motor power amounts.
 #define FULL_POWER 200 // Analog value for full motor power.
@@ -74,7 +74,7 @@ void readLDR() {
 
 // Move forward.
 void forward() {
-	Serial.println("Forward");
+	Serial.print("	Forward");
 	digitalWrite(LEFT_FORWARD, HIGH);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, HIGH);
@@ -83,7 +83,7 @@ void forward() {
 
 // Turn left.
 void turnLeft() {
-	Serial.println("Left");
+	Serial.print("	Left");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, HIGH);
 	digitalWrite(RIGHT_FORWARD, HIGH);
@@ -92,7 +92,7 @@ void turnLeft() {
 
 // Turn right.
 void turnRight() {
-	Serial.println("Right");
+	Serial.print("	Right");
 	digitalWrite(LEFT_FORWARD, HIGH);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, LOW);
@@ -101,7 +101,7 @@ void turnRight() {
 
 // Move backward.
 void backward() {
-	Serial.println("Backward");
+	Serial.print("	Backward");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, HIGH);
 	digitalWrite(RIGHT_FORWARD, LOW);
@@ -110,7 +110,7 @@ void backward() {
 
 // Stop the motors.
 void stop() {
-	Serial.println("Stop");
+	Serial.print("Stop	");
 	digitalWrite(LEFT_FORWARD, LOW);
 	digitalWrite(LEFT_BACKWARD, LOW);
 	digitalWrite(RIGHT_FORWARD, LOW);
@@ -130,7 +130,7 @@ void sense() {
 	Serial.print(" ");
 	Serial.print(middleLDR);
 	Serial.print(" ");
-	Serial.println(rightLDR);
+	Serial.print(rightLDR);
 }
 
 void backupNoise() {
@@ -140,26 +140,34 @@ void backupNoise() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (!isLDRTriggered(leftLDR) && !isLDRTriggered(middleLDR) && !isLDRTriggered(rightLDR)) {
-		turnLeft();
-		delay(10);
-	} else if (isLDRTriggered(leftLDR) && isLDRTriggered(middleLDR) && isLDRTriggered(rightLDR)) {
-		turnRight();
-		delay(10);
-	} else {
-		forward();
-		delay(5);
+	if (isLDRTriggered(leftLDR)) {
 		if (isLDRTriggered(middleLDR)) {
-			if (isLDRTriggered(leftLDR) && !isLDRTriggered(rightLDR)) {
-				forward();
+			if (isLDRTriggered(rightLDR)) {
+				turnRight();
 			} else {
 				turnRight();
-				delay(5);
 			}
 		} else {
 			if (isLDRTriggered(rightLDR)) {
 				turnRight();
+			} else {
+				forward();
 				delay(10);
+				stop();
+			}
+		}
+	} else {
+		if (isLDRTriggered(middleLDR)) {
+			if (isLDRTriggered(rightLDR)) {
+				turnLeft();
+			} else {
+				turnRight();
+			}
+		} else {
+			if (isLDRTriggered(rightLDR)) {
+				forward();
+				delay(10);
+				stop();
 			} else {
 				turnLeft();
 			}
@@ -169,8 +177,9 @@ void lineTrack() {
 
 void loop() {
 	stop();
-	delay(25);
+	delay(50);
 	sense();
 	lineTrack();
-	delay(15);
+	delay(30);
+	Serial.println();
 }
