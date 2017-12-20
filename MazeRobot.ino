@@ -34,8 +34,8 @@
 // Define motor pin numbers.
 #define LEFT_FORWARD 13 // The pin to move the left motor forwards.
 #define LEFT_BACKWARD 12 // The pin to move the left motor backwards.
-#define RIGHT_FORWARD 7 // The pin to move the right motor forwards.
-#define RIGHT_BACKWARD 6 // The pin to move the right motor backwards.
+#define RIGHT_FORWARD 4 // The pin to move the right motor forwards.
+#define RIGHT_BACKWARD 5 // The pin to move the right motor backwards.
 
 // Define miscellaneous pins.
 #define SPEAKER 3 // The pin for the speaker.
@@ -148,14 +148,14 @@ void lineTrack() {
 		}
 	} else {
 		turnRight();
+		delay(20);
 	}
 }
 
 void loop() {
-	stop();
-	delay(50);
+	forward();
+	return;
 	sense();
 	lineTrack();
-	delay(30);
 	Serial.println();
 }
