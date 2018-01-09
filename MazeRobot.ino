@@ -27,9 +27,9 @@
 #include "sounds.h"
 
 // Define LDR pins.
-#define LEFT_LDR_PIN A0
-#define MIDDLE_LDR_PIN A2
-#define RIGHT_LDR_PIN A4
+#define LEFT_LDR_PIN A2
+//#define MIDDLE_LDR_PIN A0
+#define RIGHT_LDR_PIN A1
 
 // Define motor pin numbers.
 #define LEFT_FORWARD 13 // The pin to move the left motor forwards.
@@ -41,98 +41,148 @@
 #define SPEAKER 3 // The pin for the speaker.
 
 // Variables for LDRs.
-int leftLDR, middleLDR, rightLDR;
+#define LEFT_LDR 0
+//#define MIDDLE_LDR 1
+#define RIGHT_LDR 2
 
-// Define thresholds.
-#define LDR_THRESHOLD 500
+#define LDR_COUNT 3
+
+#define CALIBRATE_THRESHOLD 200
+
+int lightReadings[LDR_COUNT];
+bool isOnBlack[LDR_COUNT];
+
+int lightThreshold;
 
 // Define motor power amounts.
-#define FULL_POWER 200 // Analog value for full motor power.
-#define HALF_POWER 150 // Analog value for half motor power.
-#define NO_POWER 0 // Analog value for no motor power.
+#define FULL_POWER LOW // Analog value for full motor power.
+#define NO_POWER LOW // Analog value for no motor power.
 
 // Setup the program.
 void setup() {
+	stop();
 	delay(100); // Give everything time to warm up.
+	Serial.begin(9600); // Start the serial communication.
+	delay(100); // Give everything time to warm up.
+	Serial.println("Starting program.");
 	// Setup the motors.
 	pinMode(LEFT_FORWARD, OUTPUT);
 	pinMode(LEFT_BACKWARD, OUTPUT);
 	pinMode(RIGHT_FORWARD, OUTPUT);
 	pinMode(RIGHT_BACKWARD, OUTPUT);
 	stop();
-
-	Serial.begin(9600); // Start the serial communication.
 	delay(1000); // Give everything time to warm up.
+	calibrateLDR();
+}
+
+// Calibrate the LDR threshold.
+void calibrateLDR() {
+	Serial.println("Starting calibration.");
+	int minReading;
+	int maxReading;
+	int diff = CALIBRATE_THRESHOLD;
+	while (diff <= CALIBRATE_THRESHOLD) {
+		int left = 0;
+		//int middle = 0;
+		int right = 0;
+		for (int i = 0; i < 10; i++) {
+			readLDR();
+			left += lightReadings[LEFT_LDR];
+			//middle += lightReadings[MIDDLE_LDR];
+			right += lightReadings[RIGHT_LDR];
+		}
+
+		left /= 10;
+		//middle /= 10;
+		right /= 10;
+
+		minReading = min(left, right);
+		maxReading = max(left, right);
+		diff = maxReading - minReading;
+		Serial.print("Calibrating... ");
+		Serial.print(lightReadings[LEFT_LDR]);
+		Serial.print(" ");
+		//Serial.print(lightReadings[MIDDLE_LDR]);
+		//Serial.print(" ");
+		Serial.println(lightReadings[RIGHT_LDR]);
+	}
+	lightThreshold = (minReading + maxReading) / 2;
+	Serial.print("Calibrated to ");
+	Serial.println(lightThreshold);
 }
 
 // Read the LDR sensors.
 void readLDR() {
-	leftLDR = analogRead(LEFT_LDR_PIN);
-	middleLDR = analogRead(MIDDLE_LDR_PIN);
-	rightLDR = analogRead(RIGHT_LDR_PIN);
+	lightReadings[LEFT_LDR] = analogRead(LEFT_LDR_PIN);
+	//lightReadings[MIDDLE_LDR] = analogRead(MIDDLE_LDR_PIN);
+	lightReadings[RIGHT_LDR] = analogRead(RIGHT_LDR_PIN);
+}
+
+// Compare the LDR readings to the light threshold, and update the LDR booleans accordingly.
+void compareLDR() {
+	isOnBlack[LEFT_LDR] = lightReadings[LEFT_LDR] > lightThreshold;
+	//isOnBlack[MIDDLE_LDR] = lightReadings[MIDDLE_LDR] > lightThreshold;
+	isOnBlack[RIGHT_LDR] = lightReadings[RIGHT_LDR] > lightThreshold;
 }
 
 // Move forward.
 void forward() {
-	Serial.print("	Forward");
-	digitalWrite(LEFT_FORWARD, HIGH);
-	digitalWrite(LEFT_BACKWARD, LOW);
-	digitalWrite(RIGHT_FORWARD, HIGH);
-	digitalWrite(RIGHT_BACKWARD, LOW);
+	Serial.print("\tForward");
+	digitalWrite(LEFT_FORWARD, FULL_POWER);
+	digitalWrite(LEFT_BACKWARD, NO_POWER);
+	digitalWrite(RIGHT_FORWARD, FULL_POWER);
+	digitalWrite(RIGHT_BACKWARD, NO_POWER);
 }
 
 // Turn left.
 void turnLeft() {
-	Serial.print("	Left");
-	digitalWrite(LEFT_FORWARD, LOW);
-	digitalWrite(LEFT_BACKWARD, HIGH);
-	digitalWrite(RIGHT_FORWARD, HIGH);
-	digitalWrite(RIGHT_BACKWARD, LOW);
+	Serial.print("\tLeft");
+	digitalWrite(LEFT_FORWARD, NO_POWER);
+	digitalWrite(LEFT_BACKWARD, FULL_POWER);
+	digitalWrite(RIGHT_FORWARD, FULL_POWER);
+	digitalWrite(RIGHT_BACKWARD, NO_POWER);
 }
 
 // Turn right.
 void turnRight() {
-	Serial.print("	Right");
-	digitalWrite(LEFT_FORWARD, HIGH);
-	digitalWrite(LEFT_BACKWARD, LOW);
-	digitalWrite(RIGHT_FORWARD, LOW);
-	digitalWrite(RIGHT_BACKWARD, HIGH);
+	Serial.print("\tRight");
+	digitalWrite(LEFT_FORWARD, FULL_POWER);
+	digitalWrite(LEFT_BACKWARD, NO_POWER);
+	digitalWrite(RIGHT_FORWARD, NO_POWER);
+	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
 }
 
 // Move backward.
 void backward() {
-	Serial.print("	Backward");
-	digitalWrite(LEFT_FORWARD, LOW);
-	digitalWrite(LEFT_BACKWARD, HIGH);
-	digitalWrite(RIGHT_FORWARD, LOW);
-	digitalWrite(RIGHT_BACKWARD, HIGH);
+	Serial.print("\tBackward");
+	digitalWrite(LEFT_FORWARD, NO_POWER);
+	digitalWrite(LEFT_BACKWARD, FULL_POWER);
+	digitalWrite(RIGHT_FORWARD, NO_POWER);
+	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
+	backupNoise();
 }
 
 // Stop the motors.
 void stop() {
-	Serial.print("Stop	");
-	digitalWrite(LEFT_FORWARD, LOW);
-	digitalWrite(LEFT_BACKWARD, LOW);
-	digitalWrite(RIGHT_FORWARD, LOW);
-	digitalWrite(RIGHT_BACKWARD, LOW);
-}
-
-// Check if a given LDR reading should trigger a reaction.
-// Returns true on black, and false on white.
-bool isLDRTriggered(int level) {
-	return (level >= LDR_THRESHOLD);
+	Serial.print("Stop\t");
+	digitalWrite(LEFT_FORWARD, NO_POWER);
+	digitalWrite(LEFT_BACKWARD, NO_POWER);
+	digitalWrite(RIGHT_FORWARD, NO_POWER);
+	digitalWrite(RIGHT_BACKWARD, NO_POWER);
 }
 
 // Read sensors.
 void sense() {
 	readLDR();
-	Serial.print(leftLDR);
+	compareLDR();
+	Serial.print(lightReadings[LEFT_LDR]);
 	Serial.print(" ");
-	Serial.print(middleLDR);
-	Serial.print(" ");
-	Serial.print(rightLDR);
+	//Serial.print(lightReadings[MIDDLE_LDR]);
+	//Serial.print(" ");
+	Serial.print(lightReadings[RIGHT_LDR]);
 }
 
+// Play a beeping noise.
 void backupNoise() {
 	noTone(SPEAKER);
 	tone(SPEAKER, BACKUP_PITCH, BACKUP_LENGTH);
@@ -140,22 +190,25 @@ void backupNoise() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (!isLDRTriggered(middleLDR) && !isLDRTriggered(rightLDR)) {
-		if (isLDRTriggered(leftLDR)) {
-			forward();
-		} else {
-			turnLeft();
-		}
-	} else {
+	if (isOnBlack[RIGHT_LDR] && !isOnBlack[LEFT_LDR]) {
+		forward();
+		delay(10);
+		stop();
+		delay(25);
+	} else if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
+		turnLeft();
+	} else if (!isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
 		turnRight();
-		delay(20);
+	} else {
+		//backward();
+		delay(10);
+		turnLeft();
+		delay(30);
 	}
 }
 
 void loop() {
-	forward();
-	return;
+	Serial.println();
 	sense();
 	lineTrack();
-	Serial.println();
 }
