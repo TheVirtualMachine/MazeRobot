@@ -43,11 +43,11 @@
 // Variables for LDRs.
 #define LEFT_LDR 0
 //#define MIDDLE_LDR 1
-#define RIGHT_LDR 2
+#define RIGHT_LDR 1
 
-#define LDR_COUNT 3
+#define LDR_COUNT 2
 
-#define CALIBRATE_THRESHOLD 200
+#define CALIBRATE_THRESHOLD 100
 
 int lightReadings[LDR_COUNT];
 bool isOnBlack[LDR_COUNT];
@@ -55,7 +55,7 @@ bool isOnBlack[LDR_COUNT];
 int lightThreshold;
 
 // Define motor power amounts.
-#define FULL_POWER LOW // Analog value for full motor power.
+#define FULL_POWER HIGH // Analog value for full motor power.
 #define NO_POWER LOW // Analog value for no motor power.
 
 // Setup the program.
@@ -85,16 +85,16 @@ void calibrateLDR() {
 		int left = 0;
 		//int middle = 0;
 		int right = 0;
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 50; i++) {
 			readLDR();
 			left += lightReadings[LEFT_LDR];
 			//middle += lightReadings[MIDDLE_LDR];
 			right += lightReadings[RIGHT_LDR];
 		}
 
-		left /= 10;
+		left /= 50;
 		//middle /= 10;
-		right /= 10;
+		right /= 50;
 
 		minReading = min(left, right);
 		maxReading = max(left, right);
@@ -102,8 +102,6 @@ void calibrateLDR() {
 		Serial.print("Calibrating... ");
 		Serial.print(lightReadings[LEFT_LDR]);
 		Serial.print(" ");
-		//Serial.print(lightReadings[MIDDLE_LDR]);
-		//Serial.print(" ");
 		Serial.println(lightReadings[RIGHT_LDR]);
 	}
 	lightThreshold = (minReading + maxReading) / 2;
@@ -120,9 +118,25 @@ void readLDR() {
 
 // Compare the LDR readings to the light threshold, and update the LDR booleans accordingly.
 void compareLDR() {
-	isOnBlack[LEFT_LDR] = lightReadings[LEFT_LDR] > lightThreshold;
-	//isOnBlack[MIDDLE_LDR] = lightReadings[MIDDLE_LDR] > lightThreshold;
-	isOnBlack[RIGHT_LDR] = lightReadings[RIGHT_LDR] > lightThreshold;
+	if (abs(lightReadings[LEFT_LDR] - lightReadings[RIGHT_LDR]) >= CALIBRATE_THRESHOLD) {
+		if (lightReadings[LEFT_LDR] > lightReadings[RIGHT_LDR]) {
+			isOnBlack[LEFT_LDR] = true;
+			isOnBlack[RIGHT_LDR] = false;
+		} else {
+			isOnBlack[LEFT_LDR] = false;
+			isOnBlack[RIGHT_LDR] = true;
+		}
+	} else {
+		int avgVal = (lightReadings[LEFT_LDR] + lightReadings[RIGHT_LDR]) / 2;
+		if (avgVal > lightThreshold) {
+			isOnBlack[LEFT_LDR] = true;
+			isOnBlack[RIGHT_LDR] = true;
+		} else {
+			isOnBlack[LEFT_LDR] = false;
+			isOnBlack[RIGHT_LDR] = false;
+		}
+
+	}
 }
 
 // Move forward.
@@ -175,11 +189,9 @@ void stop() {
 void sense() {
 	readLDR();
 	compareLDR();
-	Serial.print(lightReadings[LEFT_LDR]);
+	Serial.print(isOnBlack[LEFT_LDR]);
 	Serial.print(" ");
-	//Serial.print(lightReadings[MIDDLE_LDR]);
-	//Serial.print(" ");
-	Serial.print(lightReadings[RIGHT_LDR]);
+	Serial.print(isOnBlack[RIGHT_LDR]);
 }
 
 // Play a beeping noise.
@@ -190,20 +202,20 @@ void backupNoise() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (isOnBlack[RIGHT_LDR] && !isOnBlack[LEFT_LDR]) {
+	if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
 		forward();
 		delay(10);
 		stop();
 		delay(25);
 	} else if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
-		turnLeft();
-	} else if (!isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
+		turnRight();
+	} else if (isOnBlack[LEFT_LDR] && isOnBlack[RIGHT_LDR]) {
 		turnRight();
 	} else {
 		//backward();
-		delay(10);
+		//delay(10);
 		turnLeft();
-		delay(30);
+		//delay(30);
 	}
 }
 
