@@ -27,9 +27,8 @@
 #include "sounds.h"
 
 // Define LDR pins.
-#define LEFT_LDR_PIN A2
-//#define MIDDLE_LDR_PIN A0
-#define RIGHT_LDR_PIN A1
+#define LEFT_LDR_PIN A2 // The left LDR pin.
+#define RIGHT_LDR_PIN A1 // The right LDR pin.
 
 // Define motor pin numbers.
 #define LEFT_FORWARD 13 // The pin to move the left motor forwards.
@@ -42,34 +41,43 @@
 
 // Variables for LDRs.
 #define LEFT_LDR 0
-//#define MIDDLE_LDR 1
 #define RIGHT_LDR 1
 
+// The number of LDRs.
 #define LDR_COUNT 2
 
-#define CALIBRATE_THRESHOLD 100
+// The calibration threshold.
+#define CALIBRATE_THRESHOLD 150
 
+// The values of the LDRs.
 int lightReadings[LDR_COUNT];
+
+// If the LDRs are on black.
 bool isOnBlack[LDR_COUNT];
 
+// The threshold that marks the difference between black and white.
 int lightThreshold;
 
 // Define motor power amounts.
 #define FULL_POWER HIGH // Analog value for full motor power.
 #define NO_POWER LOW // Analog value for no motor power.
 
+// Keep track of oscillation.
+#define OSCILLATION_THRESHOLD 100 // The threshold at which to trigger an oscillation correction.
+int leftOscillationCount; // The number of times we have moved left recently.
+int rightOscillationCount; // The number of times we have moved right recently.
+
 // Setup the program.
 void setup() {
-	stop();
-	delay(100); // Give everything time to warm up.
 	Serial.begin(9600); // Start the serial communication.
-	delay(100); // Give everything time to warm up.
 	Serial.println("Starting program.");
 	// Setup the motors.
 	pinMode(LEFT_FORWARD, OUTPUT);
 	pinMode(LEFT_BACKWARD, OUTPUT);
 	pinMode(RIGHT_FORWARD, OUTPUT);
 	pinMode(RIGHT_BACKWARD, OUTPUT);
+	stop();
+	delay(100); // Give everything time to warm up.
 	stop();
 	delay(1000); // Give everything time to warm up.
 	calibrateLDR();
@@ -78,33 +86,28 @@ void setup() {
 // Calibrate the LDR threshold.
 void calibrateLDR() {
 	Serial.println("Starting calibration.");
-	int minReading;
-	int maxReading;
+	int left;
+	int right;
 	int diff = CALIBRATE_THRESHOLD;
 	while (diff <= CALIBRATE_THRESHOLD) {
-		int left = 0;
-		//int middle = 0;
-		int right = 0;
-		for (int i = 0; i < 50; i++) {
+		for (int i = 0; i < 25; i++) {
 			readLDR();
 			left += lightReadings[LEFT_LDR];
-			//middle += lightReadings[MIDDLE_LDR];
 			right += lightReadings[RIGHT_LDR];
 		}
 
-		left /= 50;
-		//middle /= 10;
-		right /= 50;
+		left /= 25;
+		right /= 25;
 
-		minReading = min(left, right);
-		maxReading = max(left, right);
-		diff = maxReading - minReading;
+		if (left > right) {
+			diff = left - right;
+		}
 		Serial.print("Calibrating... ");
-		Serial.print(lightReadings[LEFT_LDR]);
+		Serial.print(left);
 		Serial.print(" ");
-		Serial.println(lightReadings[RIGHT_LDR]);
+		Serial.println(right);
 	}
-	lightThreshold = (minReading + maxReading) / 2;
+	lightThreshold = (left + right) / 2;
 	Serial.print("Calibrated to ");
 	Serial.println(lightThreshold);
 }
@@ -112,7 +115,6 @@ void calibrateLDR() {
 // Read the LDR sensors.
 void readLDR() {
 	lightReadings[LEFT_LDR] = analogRead(LEFT_LDR_PIN);
-	//lightReadings[MIDDLE_LDR] = analogRead(MIDDLE_LDR_PIN);
 	lightReadings[RIGHT_LDR] = analogRead(RIGHT_LDR_PIN);
 }
 
@@ -178,7 +180,7 @@ void backward() {
 
 // Stop the motors.
 void stop() {
-	Serial.print("Stop\t");
+	//Serial.print("Stop\t");
 	digitalWrite(LEFT_FORWARD, NO_POWER);
 	digitalWrite(LEFT_BACKWARD, NO_POWER);
 	digitalWrite(RIGHT_FORWARD, NO_POWER);
@@ -189,9 +191,9 @@ void stop() {
 void sense() {
 	readLDR();
 	compareLDR();
-	Serial.print(isOnBlack[LEFT_LDR]);
-	Serial.print(" ");
-	Serial.print(isOnBlack[RIGHT_LDR]);
+	//Serial.print(isOnBlack[LEFT_LDR]);
+	//Serial.print(" ");
+	//Serial.print(isOnBlack[RIGHT_LDR]);
 }
 
 // Play a beeping noise.
@@ -200,23 +202,51 @@ void backupNoise() {
 	tone(SPEAKER, BACKUP_PITCH, BACKUP_LENGTH);
 }
 
+// Check for oscillation.
+bool isOscillating() {
+	return (leftOscillationCount > OSCILLATION_THRESHOLD && rightOscillationCount > OSCILLATION_THRESHOLD);
+}
+
 // Do the line tracking.
 void lineTrack() {
-	if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
-		forward();
-		delay(10);
+	if (isOscillating()) {
+		Serial.println("OSCILLATING");
 		stop();
-		delay(25);
-	} else if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
+		delay(10);
+		delay(200);
 		turnRight();
-	} else if (isOnBlack[LEFT_LDR] && isOnBlack[RIGHT_LDR]) {
-		turnRight();
+		delay(750);
+		forward();
+		delay(250);
+		rightOscillationCount = 0;
+		leftOscillationCount = 0;
 	} else {
-		//backward();
-		//delay(10);
-		turnLeft();
-		//delay(30);
+		if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
+			forward();
+			rightOscillationCount = min(OSCILLATION_THRESHOLD, rightOscillationCount);
+			leftOscillationCount = min(OSCILLATION_THRESHOLD, leftOscillationCount);
+			rightOscillationCount -= 10;
+			leftOscillationCount -= 10;
+			rightOscillationCount = max(0, rightOscillationCount);
+			leftOscillationCount = max(0, leftOscillationCount);
+			delay(5);
+		} else if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
+			turnRight();
+			rightOscillationCount++;
+			delay(10);
+		} else if (isOnBlack[LEFT_LDR] && isOnBlack[RIGHT_LDR]) {
+			backward();
+			delay(5);
+			turnRight();
+			rightOscillationCount++;
+			delay(10);
+		} else {
+			turnLeft();
+			leftOscillationCount++;
+			delay(10);
+		}
 	}
+	stop();
 }
 
 void loop() {
