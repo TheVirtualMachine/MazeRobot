@@ -47,13 +47,21 @@
 // The values of the LDRs.
 int lightReadings[LDR_COUNT];
 
-// The thresholds that marks the differences between black and white.
-int whiteEnd;
+// The thresholds that marks the difference between black and white.
+int midStart;
 int midEnd;
-int blackEndl
 
 // The state of where we are on the map.
 int state;
+
+// The state we were at on the last timer tick.
+int previousState;
+
+// How many ticks we have been on this state for.
+int ticksOnState;
+
+// How often to pulse the motor.
+#define PULSE_THRESHOLD 10
 
 // The possible values of state.
 #define ON_BLACK 0
@@ -103,7 +111,10 @@ void calibrateLDR() {
 		Serial.print(" ");
 		Serial.println(right);
 	}
-	lightThreshold = (left + right) / 2;
+	int lightThreshold = (left + right) / 2;
+	midStart = lightThreshold - (lightThreshold * 0.1);
+	midEnd = lightThreshold + (lightThreshold * 0.1);
+
 	Serial.print("Calibrated to ");
 	Serial.println(lightThreshold);
 }
@@ -116,24 +127,14 @@ void readLDR() {
 
 // Compare the LDR readings to the light threshold, and update the LDR booleans accordingly.
 void compareLDR() {
-	if (abs(lightReadings[LEFT_LDR] - lightReadings[RIGHT_LDR]) >= CALIBRATE_THRESHOLD) {
-		if (lightReadings[LEFT_LDR] > lightReadings[RIGHT_LDR]) {
-			isOnBlack[LEFT_LDR] = true;
-			isOnBlack[RIGHT_LDR] = false;
-		} else {
-			isOnBlack[LEFT_LDR] = false;
-			isOnBlack[RIGHT_LDR] = true;
-		}
-	} else {
-		int avgVal = (lightReadings[LEFT_LDR] + lightReadings[RIGHT_LDR]) / 2;
-		if (avgVal > lightThreshold) {
-			isOnBlack[LEFT_LDR] = true;
-			isOnBlack[RIGHT_LDR] = true;
-		} else {
-			isOnBlack[LEFT_LDR] = false;
-			isOnBlack[RIGHT_LDR] = false;
-		}
+	int reading = lightReadings[RIGHT_LDR];
 
+	if (reading < midStart) {
+		state = ON_WHITE;
+	} else if (reading > midEnd) {
+		state = ON_BLACK;
+	} else {
+		state = ON_MID;
 	}
 }
 
@@ -164,16 +165,6 @@ void turnRight() {
 	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
 }
 
-// Move backward.
-void backward() {
-	Serial.print("\tBackward");
-	digitalWrite(LEFT_FORWARD, NO_POWER);
-	digitalWrite(LEFT_BACKWARD, FULL_POWER);
-	digitalWrite(RIGHT_FORWARD, NO_POWER);
-	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
-	backupNoise();
-}
-
 // Stop the motors.
 void stop() {
 	//Serial.print("Stop\t");
@@ -187,63 +178,55 @@ void stop() {
 void sense() {
 	readLDR();
 	compareLDR();
-	//Serial.print(isOnBlack[LEFT_LDR]);
-	//Serial.print(" ");
-	//Serial.print(isOnBlack[RIGHT_LDR]);
+}
+
+// Pulse the forward motor.
+void pulseForward() {
+	if (ticksOnState > PULSE_THRESHOLD) {
+		turnRight();
+		delay(3);
+		ticksOnState = 0;
+		stop();
+	} else {
+		forward();
+	}
+}
+
+// Veer to the right.
+void veerRight() {
+	turnRight();
+	delay(5);
+	forward();
+}
+
+// Veer to the left.
+void veerLeft() {
+	turnLeft();
+	delay(5);
+	forward();
 }
 
 // Do the line tracking.
 void lineTrack() {
-	if (isOnBlack[RIGHT_LDR]) {
-		veerRight();
-	} else 
-	if (isOscillating()) {
-		Serial.println("OSCILLATING");
-		stop();
-		delay(50);
-		turnRight();
-		delay(750);
-		forward();
-		delay(250);
-		rightOscillationCount = 0;
-		leftOscillationCount = 0;
-	} else if (leftOscillationCount > 2 * OSCILLATION_THRESHOLD) {
-		turnLeft();
-		rightOscillationCount = 0;
-		leftOscillationCount = 0;
-		delay(100);
-	} else if (rightOscillationCount > 2 * OSCILLATION_THRESHOLD) {
-		turnRight();
-		rightOscillationCount = 0;
-		leftOscillationCount = 0;
-		delay(100);
+
+	if (state == previousState) {
+		ticksOnState++;
 	} else {
-		if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
-			forward();
-			rightOscillationCount = min(OSCILLATION_THRESHOLD, rightOscillationCount);
-			leftOscillationCount = min(OSCILLATION_THRESHOLD, leftOscillationCount);
-			rightOscillationCount -= 5;
-			leftOscillationCount -= 5;
-			rightOscillationCount = max(0, rightOscillationCount);
-			leftOscillationCount = max(0, leftOscillationCount);
-			delay(5);
-		} else if (isOnBlack[LEFT_LDR] && isOnBlack[RIGHT_LDR]) {
-			backward();
-			delay(5);
-			turnRight();
-			rightOscillationCount++;
-			delay(50);
-		} else {
-			turnLeft();
-			leftOscillationCount++;
-			delay(10);
-		}
+		ticksOnState = 0;
 	}
-	stop();
+
+	if (state == ON_BLACK) {
+		veerRight();
+	} else if (state == ON_WHITE) {
+		veerLeft();
+	} else {
+		pulseForward();
+	}
 }
 
 void loop() {
 	Serial.println();
+	previousState = state;
 	sense();
 	lineTrack();
 }
