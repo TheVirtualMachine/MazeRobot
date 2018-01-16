@@ -47,7 +47,7 @@
 #define LDR_COUNT 2
 
 // The calibration threshold.
-#define CALIBRATE_THRESHOLD 150
+#define CALIBRATE_THRESHOLD 100
 
 // The values of the LDRs.
 int lightReadings[LDR_COUNT];
@@ -212,34 +212,39 @@ void lineTrack() {
 	if (isOscillating()) {
 		Serial.println("OSCILLATING");
 		stop();
-		delay(10);
-		delay(200);
+		delay(50);
 		turnRight();
 		delay(750);
 		forward();
 		delay(250);
 		rightOscillationCount = 0;
 		leftOscillationCount = 0;
+	} else if (leftOscillationCount > 2 * OSCILLATION_THRESHOLD) {
+		turnLeft();
+		rightOscillationCount = 0;
+		leftOscillationCount = 0;
+		delay(100);
+	} else if (rightOscillationCount > 2 * OSCILLATION_THRESHOLD) {
+		turnRight();
+		rightOscillationCount = 0;
+		leftOscillationCount = 0;
+		delay(100);
 	} else {
 		if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
 			forward();
 			rightOscillationCount = min(OSCILLATION_THRESHOLD, rightOscillationCount);
 			leftOscillationCount = min(OSCILLATION_THRESHOLD, leftOscillationCount);
-			rightOscillationCount -= 10;
-			leftOscillationCount -= 10;
+			rightOscillationCount -= 5;
+			leftOscillationCount -= 5;
 			rightOscillationCount = max(0, rightOscillationCount);
 			leftOscillationCount = max(0, leftOscillationCount);
 			delay(5);
-		} else if (isOnBlack[LEFT_LDR] && !isOnBlack[RIGHT_LDR]) {
-			turnRight();
-			rightOscillationCount++;
-			delay(10);
 		} else if (isOnBlack[LEFT_LDR] && isOnBlack[RIGHT_LDR]) {
 			backward();
 			delay(5);
 			turnRight();
 			rightOscillationCount++;
-			delay(10);
+			delay(50);
 		} else {
 			turnLeft();
 			leftOscillationCount++;
