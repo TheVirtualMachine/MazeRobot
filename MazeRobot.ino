@@ -217,8 +217,16 @@ void lineTrack() {
 
 	if (state == ON_BLACK) {
 		veerRight();
+		if (ticksOnState > PULSE_THRESHOLD) {
+			turnRight();
+			ticksOnState = 0;
+		}
 	} else if (state == ON_WHITE) {
 		veerLeft();
+		if (ticksOnState > PULSE_THRESHOLD) {
+			turnLeft();
+			ticksOnState = 0;
+		}
 	} else {
 		pulseForward();
 	}
