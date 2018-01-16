@@ -24,8 +24,6 @@
 * If you have any inquiries, contact us at wongtech@vincemacri.ca              *
 ********************************************************************************/
 
-#include "sounds.h"
-
 // Define LDR pins.
 #define LEFT_LDR_PIN A2 // The left LDR pin.
 #define RIGHT_LDR_PIN A1 // The right LDR pin.
@@ -35,9 +33,6 @@
 #define LEFT_BACKWARD 12 // The pin to move the left motor backwards.
 #define RIGHT_FORWARD 4 // The pin to move the right motor forwards.
 #define RIGHT_BACKWARD 5 // The pin to move the right motor backwards.
-
-// Define miscellaneous pins.
-#define SPEAKER 3 // The pin for the speaker.
 
 // Variables for LDRs.
 #define LEFT_LDR 0
@@ -52,20 +47,22 @@
 // The values of the LDRs.
 int lightReadings[LDR_COUNT];
 
-// If the LDRs are on black.
-bool isOnBlack[LDR_COUNT];
+// The thresholds that marks the differences between black and white.
+int whiteEnd;
+int midEnd;
+int blackEndl
 
-// The threshold that marks the difference between black and white.
-int lightThreshold;
+// The state of where we are on the map.
+int state;
+
+// The possible values of state.
+#define ON_BLACK 0
+#define ON_WHITE 1
+#define ON_MID 2
 
 // Define motor power amounts.
 #define FULL_POWER HIGH // Analog value for full motor power.
 #define NO_POWER LOW // Analog value for no motor power.
-
-// Keep track of oscillation.
-#define OSCILLATION_THRESHOLD 100 // The threshold at which to trigger an oscillation correction.
-int leftOscillationCount; // The number of times we have moved left recently.
-int rightOscillationCount; // The number of times we have moved right recently.
 
 // Setup the program.
 void setup() {
@@ -77,10 +74,9 @@ void setup() {
 	pinMode(RIGHT_FORWARD, OUTPUT);
 	pinMode(RIGHT_BACKWARD, OUTPUT);
 	stop();
-	delay(100); // Give everything time to warm up.
-	stop();
 	delay(1000); // Give everything time to warm up.
 	calibrateLDR();
+	stop();
 }
 
 // Calibrate the LDR threshold.
@@ -196,19 +192,11 @@ void sense() {
 	//Serial.print(isOnBlack[RIGHT_LDR]);
 }
 
-// Play a beeping noise.
-void backupNoise() {
-	noTone(SPEAKER);
-	tone(SPEAKER, BACKUP_PITCH, BACKUP_LENGTH);
-}
-
-// Check for oscillation.
-bool isOscillating() {
-	return (leftOscillationCount > OSCILLATION_THRESHOLD && rightOscillationCount > OSCILLATION_THRESHOLD);
-}
-
 // Do the line tracking.
 void lineTrack() {
+	if (isOnBlack[RIGHT_LDR]) {
+		veerRight();
+	} else 
 	if (isOscillating()) {
 		Serial.println("OSCILLATING");
 		stop();
