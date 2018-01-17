@@ -52,7 +52,8 @@ int midStart;
 int midEnd;
 
 // The state of where we are on the map.
-int state;
+int leftState;
+int rightState;
 
 // The state we were at on the last timer tick.
 int previousState;
@@ -62,6 +63,9 @@ int ticksOnState;
 
 // How often to pulse the motor.
 #define PULSE_THRESHOLD 10
+
+// When to do a hard left.
+#define HARD_LEFT_THRESHOLD 100
 
 // The possible values of state.
 #define ON_BLACK 0
@@ -75,7 +79,6 @@ int ticksOnState;
 // Setup the program.
 void setup() {
 	Serial.begin(9600); // Start the serial communication.
-	Serial.println("Starting program.");
 	// Setup the motors.
 	pinMode(LEFT_FORWARD, OUTPUT);
 	pinMode(LEFT_BACKWARD, OUTPUT);
@@ -89,7 +92,6 @@ void setup() {
 
 // Calibrate the LDR threshold.
 void calibrateLDR() {
-	Serial.println("Starting calibration.");
 	int left;
 	int right;
 	int diff = CALIBRATE_THRESHOLD;
@@ -106,17 +108,10 @@ void calibrateLDR() {
 		if (left > right) {
 			diff = left - right;
 		}
-		Serial.print("Calibrating... ");
-		Serial.print(left);
-		Serial.print(" ");
-		Serial.println(right);
 	}
 	int lightThreshold = (left + right) / 2;
 	midStart = lightThreshold - (lightThreshold * 0.1);
 	midEnd = lightThreshold + (lightThreshold * 0.1);
-
-	Serial.print("Calibrated to ");
-	Serial.println(lightThreshold);
 }
 
 // Read the LDR sensors.
@@ -127,51 +122,86 @@ void readLDR() {
 
 // Compare the LDR readings to the light threshold, and update the LDR booleans accordingly.
 void compareLDR() {
-	int reading = lightReadings[RIGHT_LDR];
+	int leftReading = lightReadings[LEFT_LDR];
+	int rightReading = lightReadings[RIGHT_LDR];
 
-	if (reading < midStart) {
-		state = ON_WHITE;
-	} else if (reading > midEnd) {
-		state = ON_BLACK;
+	if (leftReading < midStart) {
+		leftState = ON_WHITE;
+	} else if (leftReading > midEnd) {
+		leftState = ON_BLACK;
 	} else {
-		state = ON_MID;
+		leftState = ON_MID;
+	}
+
+	if (rightReading < midStart) {
+		rightState = ON_WHITE;
+	} else if (rightReading > midEnd) {
+		rightState = ON_BLACK;
+	} else {
+		rightState = ON_MID;
 	}
 }
 
 // Move forward.
 void forward() {
-	Serial.print("\tForward");
 	digitalWrite(LEFT_FORWARD, FULL_POWER);
 	digitalWrite(LEFT_BACKWARD, NO_POWER);
 	digitalWrite(RIGHT_FORWARD, FULL_POWER);
+	digitalWrite(RIGHT_BACKWARD, NO_POWER);
+}
+
+// Move the right motor forward.
+void rightMotorForward() {
+	digitalWrite(RIGHT_FORWARD, FULL_POWER);
+	digitalWrite(RIGHT_BACKWARD, NO_POWER);
+}
+
+// Move the right motor backward.
+void rightMotorBackward() {
+	digitalWrite(RIGHT_FORWARD, NO_POWER);
+	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
+}
+
+// Move the left motor forward.
+void leftMotorForward() {
+	digitalWrite(LEFT_FORWARD, FULL_POWER);
+	digitalWrite(LEFT_BACKWARD, NO_POWER);
+}
+
+// Move the left motor backward.
+void leftMotorBackward() {
+	digitalWrite(LEFT_FORWARD, NO_POWER);
+	digitalWrite(LEFT_BACKWARD, FULL_POWER);
+}
+
+// Turn the left motor off.
+void leftMotorOff() {
+	digitalWrite(LEFT_FORWARD, NO_POWER);
+	digitalWrite(LEFT_BACKWARD, NO_POWER);
+}
+
+// Turn the right motor off.
+void rightMotorOff() {
+	digitalWrite(RIGHT_FORWARD, NO_POWER);
 	digitalWrite(RIGHT_BACKWARD, NO_POWER);
 }
 
 // Turn left.
 void turnLeft() {
-	Serial.print("\tLeft");
-	digitalWrite(LEFT_FORWARD, NO_POWER);
-	digitalWrite(LEFT_BACKWARD, FULL_POWER);
-	digitalWrite(RIGHT_FORWARD, FULL_POWER);
-	digitalWrite(RIGHT_BACKWARD, NO_POWER);
+	leftMotorBackward();
+	rightMotorForward();
 }
 
 // Turn right.
 void turnRight() {
-	Serial.print("\tRight");
-	digitalWrite(LEFT_FORWARD, FULL_POWER);
-	digitalWrite(LEFT_BACKWARD, NO_POWER);
-	digitalWrite(RIGHT_FORWARD, NO_POWER);
-	digitalWrite(RIGHT_BACKWARD, FULL_POWER);
+	leftMotorForward();
+	rightMotorBackward();
 }
 
 // Stop the motors.
 void stop() {
-	//Serial.print("Stop\t");
-	digitalWrite(LEFT_FORWARD, NO_POWER);
-	digitalWrite(LEFT_BACKWARD, NO_POWER);
-	digitalWrite(RIGHT_FORWARD, NO_POWER);
-	digitalWrite(RIGHT_BACKWARD, NO_POWER);
+	leftMotorOff();
+	rightMotorOff();
 }
 
 // Read sensors.
@@ -195,37 +225,42 @@ void pulseForward() {
 // Veer to the right.
 void veerRight() {
 	turnRight();
-	delay(5);
+	delay(10);
 	forward();
 }
 
 // Veer to the left.
 void veerLeft() {
 	turnLeft();
-	delay(5);
+	delay(10);
 	forward();
 }
 
 // Do the line tracking.
 void lineTrack() {
 
-	if (state == previousState) {
+	if (leftState == previousState) {
 		ticksOnState++;
 	} else {
 		ticksOnState = 0;
 	}
 
-	if (state == ON_BLACK) {
-		veerRight();
+	if (leftState == ON_BLACK) {
+		turnRight();
 		if (ticksOnState > PULSE_THRESHOLD) {
-			turnRight();
 			ticksOnState = 0;
+			delay(10);
 		}
-	} else if (state == ON_WHITE) {
+	} else if (leftState == ON_WHITE) {
 		veerLeft();
-		if (ticksOnState > PULSE_THRESHOLD) {
+		if (ticksOnState > HARD_LEFT_THRESHOLD) {
 			turnLeft();
 			ticksOnState = 0;
+			delay(100);
+		} else if (ticksOnState > PULSE_THRESHOLD) {
+			turnLeft();
+			ticksOnState = 0;
+			delay(10);
 		}
 	} else {
 		pulseForward();
@@ -233,8 +268,7 @@ void lineTrack() {
 }
 
 void loop() {
-	Serial.println();
-	previousState = state;
+	previousState = leftState;
 	sense();
 	lineTrack();
 }
