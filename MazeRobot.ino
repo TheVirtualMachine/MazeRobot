@@ -42,7 +42,7 @@
 #define LDR_COUNT 2
 
 // The calibration threshold.
-#define CALIBRATE_THRESHOLD 100
+#define CALIBRATE_THRESHOLD 90
 
 // The values of the LDRs.
 int lightReadings[LDR_COUNT];
@@ -62,10 +62,19 @@ int previousState;
 int ticksOnState;
 
 // How often to pulse the motor.
-#define PULSE_THRESHOLD 10
+#define PULSE_THRESHOLD 15
 
 // When to do a hard left.
-#define HARD_LEFT_THRESHOLD 100
+#define HARD_LEFT_THRESHOLD 20
+
+// When to prepare for a hard left.
+#define HARD_LEFT_MARK 125
+
+// Keep track of when to make a hard left turn.
+bool makeHardLeft;
+
+// Keep track of if we have already made a hard left turn.
+bool madeHardLeft;
 
 // The possible values of state.
 #define ON_BLACK 0
@@ -144,10 +153,14 @@ void compareLDR() {
 
 // Move forward.
 void forward() {
-	digitalWrite(LEFT_FORWARD, FULL_POWER);
-	digitalWrite(LEFT_BACKWARD, NO_POWER);
-	digitalWrite(RIGHT_FORWARD, FULL_POWER);
-	digitalWrite(RIGHT_BACKWARD, NO_POWER);
+	leftMotorForward();
+	rightMotorForward();
+}
+
+// Move backwards.
+void backward() {
+	leftMotorBackward();
+	rightMotorBackward();
 }
 
 // Move the right motor forward.
@@ -227,6 +240,7 @@ void veerRight() {
 	turnRight();
 	delay(10);
 	forward();
+	delay(5);
 }
 
 // Veer to the left.
@@ -234,10 +248,14 @@ void veerLeft() {
 	turnLeft();
 	delay(10);
 	forward();
+	delay(5);
 }
 
 // Do the line tracking.
 void lineTrack() {
+	if (leftState != ON_WHITE && previousState != ON_BLACK && ticksOnState > PULSE_THRESHOLD && ticksOnState < HARD_LEFT_MARK && !madeHardLeft) {
+		makeHardLeft = true;
+	}
 
 	if (leftState == previousState) {
 		ticksOnState++;
@@ -248,18 +266,23 @@ void lineTrack() {
 	if (leftState == ON_BLACK) {
 		turnRight();
 		if (ticksOnState > PULSE_THRESHOLD) {
-			ticksOnState = 0;
 			delay(10);
 		}
 	} else if (leftState == ON_WHITE) {
 		veerLeft();
-		if (ticksOnState > HARD_LEFT_THRESHOLD) {
-			turnLeft();
+		if (ticksOnState > HARD_LEFT_THRESHOLD && makeHardLeft) {
 			ticksOnState = 0;
-			delay(100);
+			makeHardLeft = false;
+			madeHardLeft = true;
+			turnLeft();
+			delay(1500);
+			forward();
+			delay(200);
+			turnRight();
+			delay(1500);
+			forward();
 		} else if (ticksOnState > PULSE_THRESHOLD) {
 			turnLeft();
-			ticksOnState = 0;
 			delay(10);
 		}
 	} else {
