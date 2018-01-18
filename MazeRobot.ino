@@ -47,13 +47,11 @@
 // The values of the LDRs.
 int lightReadings[LDR_COUNT];
 
-// The thresholds that marks the difference between black and white.
-int midStart;
-int midEnd;
+// The threshold that marks the difference between black and white.
+int lightThreshold;
 
 // The state of where we are on the map.
-int leftState;
-int rightState;
+int state;
 
 // The state we were at on the last timer tick.
 int previousState;
@@ -61,25 +59,12 @@ int previousState;
 // How many ticks we have been on this state for.
 int ticksOnState;
 
-// How many ticks we have been on the left state for.
-int ticksOnLeftState;
-
 // How often to pulse the motor.
 #define PULSE_THRESHOLD 15
-
-// When to do a hard left.
-#define HARD_LEFT_THRESHOLD 30
-
-// When to prepare for a hard left.
-#define HARD_LEFT_MARK 80
-
-// Keep track of when to make a hard left turn.
-bool makeHardLeft;
 
 // The possible values of state.
 #define ON_BLACK 0
 #define ON_WHITE 1
-#define ON_MID 2
 
 // Define motor power amounts.
 #define FULL_POWER HIGH // Analog value for full motor power.
@@ -118,9 +103,7 @@ void calibrateLDR() {
 			diff = left - right;
 		}
 	}
-	int lightThreshold = (left + right) / 2;
-	midStart = lightThreshold - (lightThreshold * 0.1);
-	midEnd = lightThreshold + (lightThreshold * 0.1);
+	lightThreshold = (left + right) / 2;
 }
 
 // Read the LDR sensors.
@@ -131,23 +114,12 @@ void readLDR() {
 
 // Compare the LDR readings to the light threshold, and update the LDR booleans accordingly.
 void compareLDR() {
-	int leftReading = lightReadings[LEFT_LDR];
-	int rightReading = lightReadings[RIGHT_LDR];
+	int reading = lightReadings[LEFT_LDR];
 
-	if (leftReading < midStart) {
-		leftState = ON_WHITE;
-	} else if (leftReading > midEnd) {
-		leftState = ON_BLACK;
+	if (reading < lightThreshold) {
+		state = ON_WHITE;
 	} else {
-		leftState = ON_MID;
-	}
-
-	if (rightReading < midStart) {
-		rightState = ON_WHITE;
-	} else if (rightReading > midEnd) {
-		rightState = ON_BLACK;
-	} else {
-		rightState = ON_MID;
+		state = ON_BLACK;
 	}
 }
 
@@ -253,58 +225,28 @@ void veerLeft() {
 
 // Do the line tracking.
 void lineTrack() {
-	if (rightState == ON_WHITE && leftState != ON_WHITE && previousState == ON_WHITE && ticksOnLeftState > PULSE_THRESHOLD && ticksOnLeftState < HARD_LEFT_MARK && ticksOnState > PULSE_THRESHOLD && ticksOnState < HARD_LEFT_MARK) {
-		makeHardLeft = true;
-		stop();
-		delay(500);
-	}
-
-	if (leftState == previousState) {
+	if (state == previousState) {
 		ticksOnState++;
 	} else {
 		ticksOnState = 0;
-		ticksOnLeftState = 0;
 	}
 
-	Serial.print(leftState);
-	Serial.print(" ");
-	Serial.println(ticksOnState);
-
-	if (leftState == ON_BLACK) {
+	if (state == ON_BLACK) {
 		turnRight();
-		ticksOnLeftState = 0;
 		if (ticksOnState > PULSE_THRESHOLD) {
-			delay(10);
-		}
-	} else if (leftState == ON_WHITE) {
-		veerLeft();
-		/*
-		if (ticksOnLeftState > HARD_LEFT_THRESHOLD && makeHardLeft) {
-			ticksOnState = 0;
-			ticksOnLeftState = 0;
-			makeHardLeft = false;
-			turnLeft();
-			delay(1200);
-			forward();
-			delay(300);
-			turnRight();
-			delay(1200);
-			forward();
-		} else
-		*/
-		if (ticksOnState > PULSE_THRESHOLD) {
-			turnLeft();
-			ticksOnLeftState++;
 			delay(10);
 		}
 	} else {
-		pulseForward();
-		ticksOnLeftState = 0;
+		veerLeft();
+		if (ticksOnState > PULSE_THRESHOLD) {
+			turnLeft();
+			delay(10);
+		}
 	}
 }
 
 void loop() {
-	previousState = leftState;
+	previousState = state;
 	sense();
 	lineTrack();
 }
